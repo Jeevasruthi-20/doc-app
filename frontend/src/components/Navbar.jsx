@@ -10,6 +10,17 @@ const Navbar = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { currentUser, userProfile, logout, getDisplayName, getPhotoURL, isEmailVerified } = useAuth();
+  const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
+
+  // Apply theme to document
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme(prev => prev === 'light' ? 'dark' : 'light');
+  };
 
   useEffect(() => {
     const handleScroll = () => {
@@ -62,6 +73,14 @@ const Navbar = () => {
               <li><Link to="/doctors" className={isActive('/doctors') ? 'active' : ''} onClick={closeMobileMenu}>Find a Doctor</Link></li>
               <li><Link to="/appointments" className={isActive('/appointments') ? 'active' : ''} onClick={closeMobileMenu}>Appointments</Link></li>
               <li><Link to="/profile" className={isActive('/profile') ? 'active' : ''} onClick={closeMobileMenu}>Profile</Link></li>
+              {currentUser?.role === 'admin' && (
+                <li><Link to="/admin" className={isActive('/admin') ? 'active' : ''} onClick={closeMobileMenu}>Admin</Link></li>
+              )}
+              <li className="theme-toggle-li">
+                <button className="theme-toggle-btn" onClick={toggleTheme} aria-label="Toggle theme">
+                  {theme === 'light' ? '🌙' : '☀️'}
+                </button>
+              </li>
             
              
             </ul>
@@ -79,7 +98,7 @@ const Navbar = () => {
                         <img src={getPhotoURL()} alt={getDisplayName()} />
                       ) : (
                         <div className="avatar-placeholder">
-                          {getDisplayName().charAt(0).toUpperCase()}
+                          {getDisplayName()?.charAt(0).toUpperCase()}
                         </div>
                       )}
                     </div>
@@ -96,7 +115,7 @@ const Navbar = () => {
                           <img src={getPhotoURL()} alt={getDisplayName()} />
                         ) : (
                           <div className="avatar-placeholder">
-                            {getDisplayName().charAt(0).toUpperCase()}
+                            {getDisplayName()?.charAt(0).toUpperCase()}
                           </div>
                         )}
                       </div>
@@ -148,6 +167,15 @@ const Navbar = () => {
                         </svg>
                         Billing
                       </Link>
+                      {currentUser?.role === 'admin' && (
+                        <Link to="/admin" className="menu-link admin-link">
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                            <line x1="9" y1="3" x2="9" y2="21"/>
+                          </svg>
+                          Admin Dashboard
+                        </Link>
+                      )}
                       <button onClick={handleLogout} className="menu-link logout-btn">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                           <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>

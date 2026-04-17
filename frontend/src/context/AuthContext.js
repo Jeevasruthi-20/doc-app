@@ -52,8 +52,8 @@ export const AuthProvider = ({ children }) => {
   // Sign out function
   const logout = async () => {
     try {
-      await signOut(auth);
-      await fetch('http://localhost:5000/auth/logout', {
+      await signOut(auth); // Sign out from Firebase
+      await fetch('http://localhost:5000/api/auth/logout', {
         method: 'GET',
         credentials: 'include',
       });
@@ -79,7 +79,7 @@ export const AuthProvider = ({ children }) => {
         ...updates
       }));
       
-      const response = await fetch('http://localhost:5000/api/auth/profile', {
+      const response = await fetch('http://localhost:5000/api/user/profile', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -144,7 +144,7 @@ export const AuthProvider = ({ children }) => {
 
   // Get user's display name
   const getDisplayName = () => {
-    return currentUser?.displayName || userProfile?.displayName || 'User';
+    return currentUser?.name || currentUser?.displayName || userProfile?.displayName || 'User';
   };
 
   // Get user's email

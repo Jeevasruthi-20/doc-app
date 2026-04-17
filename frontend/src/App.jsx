@@ -12,6 +12,9 @@ import Appointments from "./pages/Appointments";
 import Footer from "./components/Footer";
 import About from "./pages/About";
 import UserProfile from "./pages/UserProfile";
+import AdminDashboard from "./pages/AdminDashboard";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import BillingCalculator from "./pages/BillingCalculator";
 import PrivateRoute from "./components/PrivateRoute";
 import "./App.css";
@@ -27,6 +30,8 @@ const App = () => (
             <Route path="/about" element={<About />} />
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password/:token" element={<ResetPassword />} />
             
             {/* Protected Routes */}
             <Route element={<PrivateRoute />}>
@@ -34,6 +39,7 @@ const App = () => (
               <Route path="/doctors" element={<Doctors />} />
               <Route path="/profile" element={<UserProfile />} />
               <Route path="/billing" element={<BillingCalculator />} />
+              <Route path="/admin" element={<AdminDashboard />} />
             </Route>
             
             <Route path="*" element={<Navigate to="/" replace />} />

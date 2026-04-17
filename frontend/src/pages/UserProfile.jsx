@@ -11,10 +11,9 @@ const ProfileStat = ({ label, value }) => (
 
 const InfoItem = ({ icon, label, value, isEditable = false, onEdit, fieldName }) => (
   <div className="info-item">
-    <span className="info-icon" aria-hidden="true">{icon}</span>
-    <div className="info-content">
+    <div className="info-content-wrapper">
       <span className="info-label">{label}</span>
-      <span className="info-value">{value || "—"}</span>
+      <span className={`info-value ${!value ? 'empty' : ''}`}>{value || "Not provided"}</span>
     </div>
     {isEditable && (
       <button 
@@ -49,12 +48,14 @@ const Avatar = ({ name, photoUrl, onPhotoChange }) => {
 
   if (photoUrl) {
     return (
-      <div className="avatar-container">
-        <img className="avatar" src={photoUrl} alt={name} />
-        <button className="photo-edit-btn" onClick={handlePhotoClick}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+      <div className="profile-avatar-section">
+        <div className="profile-avatar">
+          <img src={photoUrl} alt={name} />
+        </div>
+        <button className="edit-avatar-btn" onClick={handlePhotoClick} aria-label="Change photo">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+            <circle cx="12" cy="13" r="4"/>
           </svg>
         </button>
       </div>
@@ -71,12 +72,12 @@ const Avatar = ({ name, photoUrl, onPhotoChange }) => {
     : "U";
     
   return (
-    <div className="avatar-container">
-      <div className="avatar initials">{initials}</div>
-      <button className="photo-edit-btn" onClick={handlePhotoClick}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+    <div className="profile-avatar-section">
+      <div className="profile-avatar initials">{initials}</div>
+      <button className="edit-avatar-btn" onClick={handlePhotoClick} aria-label="Upload photo">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+          <circle cx="12" cy="13" r="4"/>
         </svg>
       </button>
     </div>
@@ -87,9 +88,23 @@ const EditModal = ({ isOpen, onClose, field, currentValue, onSave }) => {
   const [value, setValue] = useState(currentValue || '');
   const [loading, setLoading] = useState(false);
 
-  const handleSave = async () => {
+  const handleSave = async (e) => {
+    e.preventDefault();
     setLoading(true);
+
     try {
+      const formData = new FormData();
+      formData.append(field, value);
+
+      const res = await fetch("http://localhost:5000/api/user/profile", {
+        method: "PUT",
+        credentials: 'include',
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+      
       await onSave(field, value);
       onClose();
     } catch (error) {
@@ -186,12 +201,12 @@ const EditModal = ({ isOpen, onClose, field, currentValue, onSave }) => {
 const API_BASE_URL = "http://localhost:5000/api";
 
 const UserProfile = () => {
-  const { currentUser, userProfile, updateUserProfile, getDisplayName, getPhotoURL, getCreationTime } = useAuth();
+  const { currentUser, setCurrentUser, userProfile, updateUserProfile, getDisplayName, getPhotoURL, getCreationTime } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [editModal, setEditModal] = useState({ isOpen: false, field: '', currentValue: '' });
   const [loading, setLoading] = useState(false);
+  const [photoPreview, setPhotoPreview] = useState(null);
 
-  // Extended user data with additional fields
   const [extendedProfile, setExtendedProfile] = useState({
     dob: "",
     address: "",
@@ -206,36 +221,23 @@ const UserProfile = () => {
     }
   });
 
-  // Load extended profile data from backend API and localStorage on component mount
   useEffect(() => {
-    if (currentUser?.email) {
-      fetch(`${API_BASE_URL}/profile/${currentUser.email}`)
-        .then(res => res.json())
-        .then(data => {
-          if (data && !data.message) {
-            setExtendedProfile({
-              dob: data.dob,
-              address: data.address?.street || "",
-              bloodGroup: data.bloodGroup,
-              allergies: Array.isArray(data.allergies) ? data.allergies.map(a => a.name).join(", ") : data.allergies || "None",
-              heightCm: data.height,
-              weightKg: data.weight,
-              emergencyContact: {
-                name: data.emergencyContact?.name || "",
-                phone: data.emergencyContact?.phone || "",
-                relation: data.emergencyContact?.relationship || ""
-              }
-            });
-          }
-        })
-        .catch(err => console.error("Failed to fetch profile:", err));
+    if (currentUser) {
+      setExtendedProfile({
+        dob: currentUser.dob || "",
+        address: currentUser.address?.street || "",
+        bloodGroup: currentUser.bloodGroup || "",
+        allergies: Array.isArray(currentUser.allergies) ? currentUser.allergies.map(a => a.name).join(", ") : currentUser.allergies || "None",
+        heightCm: currentUser.height || "",
+        weightKg: currentUser.weight || "",
+        emergencyContact: {
+          name: currentUser.emergencyContact?.name || "",
+          phone: currentUser.emergencyContact?.phone || "",
+          relation: currentUser.emergencyContact?.relationship || ""
+        }
+      });
     }
   }, [currentUser]);
-
-  // Save extended profile data to localStorage whenever it changes
-  useEffect(() => {
-    localStorage.setItem('extendedProfile', JSON.stringify(extendedProfile));
-  }, [extendedProfile]);
 
   const handleEdit = (field, currentValue) => {
     setEditModal({ isOpen: true, field, currentValue });
@@ -244,27 +246,30 @@ const UserProfile = () => {
   const handleSave = async (field, value) => {
     setLoading(true);
     try {
-      if (field === 'displayName' || field === 'photoURL') {
-        // Update Firebase profile
-        await updateUserProfile({ [field]: value });
-      } else if (field.startsWith('emergencyContact')) {
-        // Update emergency contact fields
-        const contactField = field.replace('emergencyContact', '').toLowerCase();
-        const updatedProfile = {
-          ...extendedProfile,
-          emergencyContact: {
-            ...extendedProfile.emergencyContact,
-            [contactField]: value
-          }
-        };
-        setExtendedProfile(updatedProfile);
-      } else {
-        // Update other extended profile fields
-        setExtendedProfile(prev => ({
-          ...prev,
-          [field]: value
-        }));
+      // Create updates object for API
+      const updates = {};
+      
+      // Map frontend field names to backend expectations if necessary
+      if (field === 'displayName') updates.name = value;
+      else if (field === 'emergencyContactName') updates.emergencyContactName = value;
+      else if (field === 'emergencyContactPhone') updates.emergencyContactPhone = value;
+      else if (field === 'emergencyContactRelation') updates.emergencyContactRelation = value;
+      else updates[field] = value;
+
+      const res = await fetch("http://localhost:5000/api/user/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: 'include',
+        body: JSON.stringify(updates),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || "Update failed");
       }
+
+      const updatedUser = await res.json();
+      setCurrentUser(updatedUser.user || updatedUser); // Update AuthContext with full object from backend
     } catch (error) {
       console.error('Profile update failed:', error);
       throw error;
@@ -274,12 +279,28 @@ const UserProfile = () => {
   };
 
   const handlePhotoChange = async (file) => {
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setPhotoPreview(reader.result);
+    };
+    reader.readAsDataURL(file);
+
     try {
-      // For now, we'll just update the display name to show the photo was changed
-      // In a real app, you'd upload the file to Firebase Storage and get the URL
-      await updateUserProfile({ 
-        displayName: getDisplayName() + ' (Photo Updated)' 
+      const formData = new FormData();
+      formData.append('profileImage', file);
+
+      const res = await fetch("http://localhost:5000/api/user/profile", {
+        method: "PUT",
+        credentials: 'include',
+        body: formData,
       });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+
+      updateUserProfile(data.user);
     } catch (error) {
       console.error('Photo update failed:', error);
     }
@@ -301,7 +322,7 @@ const UserProfile = () => {
     name: getDisplayName(),
     email: currentUser.email,
     phone: currentUser.phoneNumber || extendedProfile.phoneNumber || "",
-    photoUrl: getPhotoURL(),
+    photoUrl: photoPreview || currentUser.profileImage ? `http://localhost:5000${currentUser.profileImage}` : getPhotoURL(),
     address: extendedProfile.address,
     bloodGroup: extendedProfile.bloodGroup,
     allergies: extendedProfile.allergies,
@@ -313,7 +334,7 @@ const UserProfile = () => {
 
   return (
     <div className="profile-page">
-      <div className="container">
+      <div className="profile-container">
         <div className="profile-header card">
           <div className="profile-identity">
             <Avatar 
@@ -323,43 +344,21 @@ const UserProfile = () => {
             />
             <div>
               <h1 className="profile-name">{user.name}</h1>
-              <p className="profile-subtitle">Patient</p>
-              <p className="profile-email">{user.email}</p>
-              {currentUser.emailVerified ? (
-                <span className="verification-badge verified">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <polyline points="20,6 9,17 4,12"/>
-                  </svg>
-                  Email Verified
-                </span>
-              ) : (
-                <span className="verification-badge unverified">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <circle cx="12" cy="12" r="10"/>
-                    <line x1="12" y1="8" x2="12" y2="12"/>
-                    <line x1="12" y1="16" x2="12.01" y2="16"/>
-                  </svg>
-                  Email Not Verified
-                </span>
-              )}
-              {user.signupDate && (
-                <p className="profile-signup-date">
-                  Member since {new Date(user.signupDate).toLocaleDateString()}
-                </p>
-              )}
+              <div className="profile-badges">
+                <span className="role-badge">Patient</span>
+              </div>
             </div>
-          </div>
-
-          <div className="profile-stats">
-            <ProfileStat label="Height" value={user.heightCm ? `${user.heightCm} cm` : null} />
-            <ProfileStat label="Weight" value={user.weightKg ? `${user.weightKg} kg` : null} />
-            <ProfileStat label="Blood" value={user.bloodGroup} />
           </div>
         </div>
 
-        <div className="profile-grid">
-          <div className="card">
-            <h2 className="section-heading">Contact</h2>
+        <div className="profile-content-grid">
+          <div className="info-card card">
+            <h2 className="section-heading">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+              </svg>
+              Contact info
+            </h2>
             <div className="info-list">
               <InfoItem icon="📧" label="Email" value={user.email} />
               <InfoItem 
@@ -381,8 +380,13 @@ const UserProfile = () => {
             </div>
           </div>
 
-          <div className="card">
-            <h2 className="section-heading">Personal</h2>
+          <div className="info-card card">
+            <h2 className="section-heading">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+              </svg>
+              Personal details
+            </h2>
             <div className="info-list">
               <InfoItem 
                 icon="🎂" 
@@ -427,8 +431,13 @@ const UserProfile = () => {
             </div>
           </div>
 
-          <div className="card">
-            <h2 className="section-heading">Emergency Contact</h2>
+          <div className="info-card card">
+            <h2 className="section-heading">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+              </svg>
+              Emergency contact
+            </h2>
             <div className="info-list">
               <InfoItem 
                 icon="👤" 

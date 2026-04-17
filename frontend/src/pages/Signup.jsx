@@ -15,6 +15,7 @@ const Signup = () => {
     email: "",
     phone: "",
     dob: "",
+    gender: "male",
     password: "",
     confirmPassword: "",
     // Additional profile fields
@@ -133,10 +134,29 @@ const Signup = () => {
       // Send email verification
       await sendEmailVerification(userCredential.user);
 
+      // SAVE TO BACKEND MONGO
+      const backendRes = await fetch("http://localhost:5000/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          dob: formData.dob,
+          gender: formData.gender,
+          password: formData.password
+        }),
+      });
+
+      if (!backendRes.ok) {
+        const errorData = await backendRes.json();
+        throw new Error(errorData.message || "Backend registration failed");
+      }
+
       setSuccess("Account created successfully! Please check your email for verification.");
       
       // Redirect to profile after 3 seconds
-      setTimeout(() => navigate("/profile"), 3000);
+      setTimeout(() => navigate("/login"), 3000);
     } catch (error) {
       let errorMessage = "Signup failed";
       switch (error.code) {
@@ -355,6 +375,23 @@ const Signup = () => {
                       onChange={handleChange}
                       required
                     />
+                  </div>
+                </div>
+
+                <div className="form-row">
+                  <div className="form-group">
+                    <label className="form-label">Gender *</label>
+                    <select
+                      name="gender"
+                      className="form-input"
+                      value={formData.gender}
+                      onChange={handleChange}
+                      required
+                    >
+                      <option value="male">Male</option>
+                      <option value="female">Female</option>
+                      <option value="other">Other</option>
+                    </select>
                   </div>
                 </div>
               </div>

@@ -4,30 +4,49 @@ import React, { createContext, useState, useContext, useEffect } from "react";
 const AppointmentsContext = createContext();
 
 export const AppointmentsProvider = ({ children }) => {
-  // ✅ Load appointments from localStorage initially
-  const [appointments, setAppointments] = useState(() => {
-    const saved = localStorage.getItem("appointments");
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [appointments, setAppointments] = useState([]);
+  const [loading, setLoading] = useState(false);
 
-  // ✅ Save appointments to localStorage whenever they change
-  useEffect(() => {
-    localStorage.setItem("appointments", JSON.stringify(appointments));
-  }, [appointments]);
-
-  // Add new appointment
-  const addAppointment = (appointment) => {
-    setAppointments((prev) => [...prev, appointment]);
+  // Fetch appointments from API
+  const fetchAppointments = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("http://localhost:5000/api/appointments/user");
+      const data = await res.json();
+      if (res.ok) setAppointments(data);
+    } catch (err) {
+      console.error("Failed to fetch appointments:", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Remove appointment
-  const removeAppointment = (id) => {
-    setAppointments((prev) => prev.filter((appt) => appt.id !== id));
+  useEffect(() => {
+    fetchAppointments();
+  }, []);
+
+  const addAppointment = (appointment) => {
+    setAppointments((prev) => [appointment, ...prev]);
+  };
+
+  const cancelAppointment = async (id) => {
+    try {
+      const res = await fetch(`http://localhost:5000/api/appointments/${id}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        setAppointments(prev => prev.map(apt => 
+          apt._id === id ? { ...apt, status: 'cancelled' } : apt
+        ));
+      }
+    } catch (err) {
+      console.error("Failed to cancel appointment:", err);
+    }
   };
 
   return (
     <AppointmentsContext.Provider
-      value={{ appointments, addAppointment, removeAppointment, setAppointments }}
+      value={{ appointments, addAppointment, cancelAppointment, fetchAppointments, loading, setAppointments }}
     >
       {children}
     </AppointmentsContext.Provider>

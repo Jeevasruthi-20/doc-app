@@ -6,7 +6,6 @@ const userSchema = new mongoose.Schema({
   email: { 
     type: String, 
     required: true, 
-    unique: true,
     trim: true,
     lowercase: true,
     match: [/^\S+@\S+\.\S+$/, 'Please use a valid email address']
@@ -15,6 +14,10 @@ const userSchema = new mongoose.Schema({
     type: String, 
     required: true,
     select: false // Don't return password in queries
+  },
+  profileImage: {
+    type: String,
+    default: null
   },
   
   // Personal Information
@@ -96,6 +99,10 @@ const userSchema = new mongoose.Schema({
   lastLogin: {
     type: Date
   },
+  resetPasswordToken: String,
+  resetPasswordExpires: Date,
+  resetPasswordOTP: String,
+  resetPasswordOTPExpires: Date,
   
   // Role
   role: {

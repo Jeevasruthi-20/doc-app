@@ -4,7 +4,7 @@ import "./Appointments.css";
 import Modal from "react-modal";
 
 const Appointments = () => {
-  const { appointments, setAppointments } = useAppointments();
+  const { appointments, cancelAppointment, loading } = useAppointments();
 
   const [activeTab, setActiveTab] = useState("upcoming");
   const [showBookingModal, setShowBookingModal] = useState(false);
@@ -43,11 +43,9 @@ const Appointments = () => {
     }
   };
 
-  const handleCancelAppointment = (id) => {
+  const handleCancelAppointment = async (id) => {
     if (window.confirm("Are you sure you want to cancel this appointment?")) {
-      setAppointments(appointments.map(apt => 
-        apt.id === id ? { ...apt, status: "cancelled" } : apt
-      ));
+      await cancelAppointment(id);
     }
   };
 
@@ -142,11 +140,11 @@ const Appointments = () => {
           ) : (
             <div className="appointments-list">
               {filteredAppointments.map((appointment) => (
-                <div className="appointment-card card" key={appointment.id}>
+                <div className="appointment-card card" key={appointment._id}>
                   <div className="appointment-header">
                     <div className="appointment-info">
-                      <h3 className="doctor-name">{appointment.doctorName}</h3>
-                      <p className="specialty">{appointment.specialty}</p>
+                      <h3 className="doctor-name">{appointment.doctorName || appointment.doctor?.name}</h3>
+                      <p className="specialty">{appointment.specialty || appointment.doctor?.specialization}</p>
                     </div>
                     <div className={`status-badge ${getStatusColor(appointment.status)}`}>
                       {getStatusText(appointment.status)}
@@ -180,13 +178,13 @@ const Appointments = () => {
                       <>
                         <button 
                           className="btn secondary-btn"
-                          onClick={() => handleRescheduleAppointment(appointment.id)}
+                          onClick={() => handleRescheduleAppointment(appointment._id)}
                         >
                           Reschedule
                         </button>
                         <button 
                           className="btn secondary-btn"
-                          onClick={() => handleCancelAppointment(appointment.id)}
+                          onClick={() => handleCancelAppointment(appointment._id)}
                         >
                           Cancel
                         </button>
@@ -195,7 +193,7 @@ const Appointments = () => {
                     {appointment.status === "pending" && (
                       <button 
                         className="btn secondary-btn"
-                        onClick={() => handleCancelAppointment(appointment.id)}
+                        onClick={() => handleCancelAppointment(appointment._id)}
                       >
                         Cancel
                       </button>
@@ -238,40 +236,113 @@ const Appointments = () => {
         onRequestClose={handleCloseBookingModal}
         contentLabel="Book Appointment"
         ariaHideApp={false}
-        className="modal"
+        className="modal-container"
         overlayClassName="modal-overlay"
       >
-        <form onSubmit={handleBookAppointment} className="booking-form">
-          <h2>Book Appointment</h2>
-          <label>
-            Doctor:
-            <input type="text" name="doctor" value={bookingData.doctor} onChange={handleBookingInputChange} required />
-          </label>
-          <label>
-            Date:
-            <input type="date" name="date" value={bookingData.date} onChange={handleBookingInputChange} required />
-          </label>
-          <label>
-            Time:
-            <input type="time" name="time" value={bookingData.time} onChange={handleBookingInputChange} required />
-          </label>
-          <label>
-            Type:
-            <select name="type" value={bookingData.type} onChange={handleBookingInputChange} required>
-              <option value="in-person">In Person</option>
-              <option value="video-call">Video Call</option>
-            </select>
-          </label>
-          <label>
-            Reason:
-            <input type="text" name="reason" value={bookingData.reason} onChange={handleBookingInputChange} required />
-          </label>
-          {bookingError && <div className="error-msg">{bookingError}</div>}
-          <div className="modal-actions">
-            <button type="button" className="btn secondary-btn" onClick={handleCloseBookingModal}>Cancel</button>
-            <button type="submit" className="btn primary-btn">Book</button>
+        <div className="modal-content appointment-modal">
+          <div className="modal-header">
+            <div className="header-info">
+              <h2>Book New Appointment</h2>
+              <p>Fill in the details below to schedule your visit</p>
+            </div>
+            <button className="close-modal-btn" onClick={handleCloseBookingModal}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
           </div>
-        </form>
+
+          <form onSubmit={handleBookAppointment} className="booking-form">
+            <div className="form-grid">
+              <div className="form-group full-width">
+                <label>Select Doctor</label>
+                <div className="input-wrapper">
+                  <span className="input-icon">👨‍⚕️</span>
+                  <input 
+                    type="text" 
+                    name="doctor" 
+                    placeholder="e.g. Dr. Sarah Smith"
+                    value={bookingData.doctor} 
+                    onChange={handleBookingInputChange} 
+                    className="form-input"
+                    required 
+                  />
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>Preferred Date</label>
+                <div className="input-wrapper">
+                  <input 
+                    type="date" 
+                    name="date" 
+                    value={bookingData.date} 
+                    onChange={handleBookingInputChange} 
+                    className="form-input"
+                    required 
+                  />
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>Preferred Time</label>
+                <div className="input-wrapper">
+                  <input 
+                    type="time" 
+                    name="time" 
+                    value={bookingData.time} 
+                    onChange={handleBookingInputChange} 
+                    className="form-input"
+                    required 
+                  />
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>Appointment Type</label>
+                <select 
+                  name="type" 
+                  value={bookingData.type} 
+                  onChange={handleBookingInputChange} 
+                  className="form-input"
+                  required
+                >
+                  <option value="in-person">🏥 In-Person Visit</option>
+                  <option value="video-call">💻 Video Consultation</option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label>Reason for Visit</label>
+                <input 
+                  type="text" 
+                  name="reason" 
+                  placeholder="e.g. Regular checkup"
+                  value={bookingData.reason} 
+                  onChange={handleBookingInputChange} 
+                  className="form-input"
+                  required 
+                />
+              </div>
+            </div>
+
+            {bookingError && (
+              <div className="error-banner">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+                {bookingError}
+              </div>
+            )}
+
+            <div className="modal-footer">
+              <button type="button" className="btn secondary-btn" onClick={handleCloseBookingModal}>Cancel</button>
+              <button type="submit" className="btn primary-btn booking-submit-btn">
+                Confirm Booking
+              </button>
+            </div>
+          </form>
+        </div>
       </Modal>
     </div>
   );

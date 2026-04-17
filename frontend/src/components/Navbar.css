@@ -10,12 +10,17 @@
 }
 
 .navbar.scrolled {
-  background: rgba(255, 255, 255, 0.82);
+  background: var(--navbar-bg);
   backdrop-filter: blur(15px);
   -webkit-backdrop-filter: blur(15px);
   padding: 0.75rem 0;
-  border-bottom: 1px solid rgba(0, 105, 192, 0.1);
-  box-shadow: 0 10px 30px -10px rgba(0, 105, 192, 0.1);
+  border-bottom: 1px solid var(--border-color);
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.1);
+}
+
+[data-theme='dark'] .navbar.scrolled {
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.5);
 }
 
 .navbar .container {
@@ -161,6 +166,10 @@
   color: var(--text-primary);
 }
 
+[data-theme='dark'] .logo-text {
+  color: #fff;
+}
+
 .dropdown-arrow {
   font-size: 0.75rem;
   color: var(--text-muted);
@@ -175,7 +184,7 @@
   top: calc(100% + 15px);
   right: 0;
   width: 260px;
-  background: #fff;
+  background: var(--bg-card);
   border-radius: var(--radius-lg);
   box-shadow: 0 15px 40px rgba(0, 105, 192, 0.15);
   border: 1px solid rgba(0, 105, 192, 0.08);
@@ -242,7 +251,7 @@
     position: fixed;
     top: 0; right: 0;
     width: 300px; height: 100vh;
-    background: #fff;
+    background: var(--bg-card);
     flex-direction: column;
     padding: 6rem 2rem;
     box-shadow: -10px 0 30px rgba(0, 0, 0, 0.05);

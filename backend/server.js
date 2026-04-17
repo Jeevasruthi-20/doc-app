@@ -8,6 +8,10 @@ require("dotenv").config(); // ensure you have a .env with MONGO_URI
 require('./config/auth'); // Initialize passport
 
 const authRoutes = require("./routes/authRoutes");
+const adminRoutes = require("./routes/adminRoutes");
+const userRoutes = require("./routes/userRoutes");
+const appointmentRoutes = require("./routes/appointmentRoutes");
+const path = require("path");
 
 const app = express();
 
@@ -33,8 +37,14 @@ app.use(session({
 app.use(passport.initialize());
 app.use(passport.session());
 
+// Static folder for uploads
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
 // Routes
 app.use("/api/auth", authRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api/user", userRoutes);
+app.use("/api/appointments", appointmentRoutes);
 
 // Google OAuth Routes
 app.get('/auth/google',
