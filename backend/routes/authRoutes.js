@@ -9,7 +9,11 @@ const crypto = require("crypto");
 
 router.post("/signup", async (req, res) => {
   try {
-    const { name, email, phone, dob, gender, password } = req.body;
+    const { 
+      name, email, phone, dob, gender, password,
+      bloodGroup, allergies, conditions, medications, 
+      emergencyContactName, emergencyContactPhone, emergencyContactRelation
+    } = req.body;
 
     const existingUser = await User.findOne({ email });
     if (existingUser) {
@@ -25,6 +29,15 @@ router.post("/signup", async (req, res) => {
       dob: new Date(dob),
       gender: gender || 'male', // Default to male if not provided, though it should be required
       password: hashedPassword,
+      bloodGroup: bloodGroup || null,
+      allergies: allergies ? [{ name: allergies }] : [],
+      medicalConditions: conditions ? [{ name: conditions }] : [],
+      medications: medications ? [{ name: medications }] : [],
+      emergencyContact: {
+        name: emergencyContactName || '',
+        phone: emergencyContactPhone || '',
+        relationship: emergencyContactRelation || ''
+      }
     });
 
 

@@ -12,12 +12,40 @@ const adminRoutes = require("./routes/adminRoutes");
 const userRoutes = require("./routes/userRoutes");
 const appointmentRoutes = require("./routes/appointmentRoutes");
 const path = require("path");
+const helmet = require("helmet");
+const rateLimit = require("express-rate-limit");
+const { errorHandler, notFound } = require("./middleware/errorMiddleware");
 
 const app = express();
 
+// Security Headers
+app.use(helmet());
+app.use(helmet.crossOriginResourcePolicy({ policy: "cross-origin" })); // Allows loading images from frontend
+
+// Rate Limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per `window` (here, per 15 minutes)
+  message: { success: false, message: 'Too many requests from this IP, please try again later.' },
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+});
+app.use("/api", limiter);
+
 // Middleware
+const allowedOrigins = [
+  "http://localhost:3000",
+  process.env.FRONTEND_URL // Useful for Vercel/Render frontend deployments
+].filter(Boolean);
+
 app.use(cors({ 
-  origin: "http://localhost:3000",
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true 
 }));
 app.use(express.json());
@@ -64,15 +92,26 @@ app.get('/auth/google/callback',
 
 // Logout route
 app.get('/auth/logout', (req, res) => {
-  req.logout();
-  res.redirect('http://localhost:3000/login');
+  req.logout((err) => {
+    if (err) return next(err);
+    res.redirect('http://localhost:3000/login');
+  });
 });
 
-// Health check (optional)
-app.get("/api/health", (req, res) => res.json({ status: "ok" }));
+// Health check
+app.get("/api/health", (req, res) => res.json({ success: true, message: "API is running..." }));
+
+// Global Error Handlers (must be after all routes)
+app.use(notFound);
+app.use(errorHandler);
 
 // DB + start
 const PORT = process.env.PORT || 5000;
+
+if (!process.env.MONGO_URI) {
+  console.error("❌ FATAL ERROR: MONGO_URI is not defined in environment variables.");
+  process.exit(1);
+}
 mongoose
   .connect(process.env.MONGO_URI)
   .then(() => {

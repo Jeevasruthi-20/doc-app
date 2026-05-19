@@ -17,13 +17,17 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import BillingCalculator from "./pages/BillingCalculator";
 import PrivateRoute from "./components/PrivateRoute";
+import ErrorBoundary from "./components/ErrorBoundary";
+import { Toaster } from "react-hot-toast";
 import "./App.css";
 
 const App = () => (
-  <AuthProvider>
-    <AppointmentsProvider>
-      <div className="app-wrapper">
-        <Navbar />
+  <ErrorBoundary>
+    <AuthProvider>
+      <AppointmentsProvider>
+        <div className="app-wrapper">
+          <Toaster position="top-center" />
+          <Navbar />
         <main className="main-content">
           <Routes>
             <Route path="/" element={<Home />} />
@@ -49,6 +53,7 @@ const App = () => (
       </div>
     </AppointmentsProvider>
   </AuthProvider>
+  </ErrorBoundary>
 );
 
 export default App;

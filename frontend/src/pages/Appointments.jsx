@@ -1,349 +1,341 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useAppointments } from "../context/AppointmentsContext";
+import { toast } from "react-hot-toast";
 import "./Appointments.css";
-import Modal from "react-modal";
+
+// Mock Doctors Data for selection (since we don't have a specific DoctorsContext yet)
+const mockDoctors = [
+  { id: "d1", name: "Dr. Sarah Smith", specialty: "Cardiologist", avatar: "https://ui-avatars.com/api/?name=Sarah+Smith&background=0D8ABC&color=fff" },
+  { id: "d2", name: "Dr. Michael Chen", specialty: "Neurologist", avatar: "https://ui-avatars.com/api/?name=Michael+Chen&background=22C55E&color=fff" },
+  { id: "d3", name: "Dr. Emily Davis", specialty: "Pediatrician", avatar: "https://ui-avatars.com/api/?name=Emily+Davis&background=F59E0B&color=fff" },
+  { id: "d4", name: "Dr. James Wilson", specialty: "General Physician", avatar: "https://ui-avatars.com/api/?name=James+Wilson&background=EC4899&color=fff" },
+];
+
+const timeSlots = [
+  "09:00 AM", "09:30 AM", "10:00 AM", "10:30 AM",
+  "11:00 AM", "11:30 AM", "01:00 PM", "01:30 PM",
+  "02:00 PM", "02:30 PM", "03:00 PM", "03:30 PM"
+];
 
 const Appointments = () => {
   const { appointments, cancelAppointment, loading } = useAppointments();
 
   const [activeTab, setActiveTab] = useState("upcoming");
-  const [showBookingModal, setShowBookingModal] = useState(false);
-  const [bookingData, setBookingData] = useState({
-    doctor: "",
-    date: "",
-    time: "",
-    type: "in-person",
-    reason: ""
-  });
-  const [bookingError, setBookingError] = useState("");
+  
+  // Booking Modal State
+  const [showModal, setShowModal] = useState(false);
+  const [bookingStep, setBookingStep] = useState(1);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Form Data
+  const [selectedDoc, setSelectedDoc] = useState(null);
+  const [selectedDate, setSelectedDate] = useState("");
+  const [selectedTime, setSelectedTime] = useState("");
+  const [visitType, setVisitType] = useState("in-person");
+  const [visitReason, setVisitReason] = useState("");
+
+  // Set minimum date to today
+  const today = new Date().toISOString().split('T')[0];
 
   const getStatusColor = (status) => {
     switch (status) {
-      case "confirmed":
-        return "success";
-      case "pending":
-        return "warning";
-      case "cancelled":
-        return "danger";
-      default:
-        return "default";
+      case "confirmed": return "success";
+      case "pending": return "warning";
+      case "cancelled": return "danger";
+      default: return "default";
     }
   };
 
   const getStatusText = (status) => {
     switch (status) {
-      case "confirmed":
-        return "Confirmed";
-      case "pending":
-        return "Pending";
-      case "cancelled":
-        return "Cancelled";
-      default:
-        return status;
+      case "confirmed": return "Confirmed";
+      case "pending": return "Pending";
+      case "cancelled": return "Cancelled";
+      default: return status;
     }
   };
 
   const handleCancelAppointment = async (id) => {
     if (window.confirm("Are you sure you want to cancel this appointment?")) {
       await cancelAppointment(id);
+      toast.success("Appointment cancelled");
     }
   };
 
-  const handleRescheduleAppointment = (id) => {
-    alert(`Rescheduling appointment ${id}. This would open a rescheduling form.`);
-  };
-
   const filteredAppointments = appointments.filter(apt => {
-    const appointmentDateTime = new Date(`${apt.date}T${apt.time}`);
+    const aptDate = apt.date; // assuming YYYY-MM-DD
+    const aptTime = apt.time; // assuming HH:MM AM/PM or HH:MM
+    // Since mock data times might vary, simple date check for now
+    const aptDateTime = new Date(`${aptDate}T00:00:00`); 
     const now = new Date();
+    now.setHours(0,0,0,0);
+
     if (activeTab === "upcoming") {
-      return (apt.status === "confirmed" || apt.status === "pending") && appointmentDateTime > now;
+      return (apt.status === "confirmed" || apt.status === "pending") && aptDateTime >= now;
     } else if (activeTab === "past") {
-      return appointmentDateTime <= now || apt.status === "cancelled";
+      return aptDateTime < now || apt.status === "cancelled";
     }
     return true;
   });
 
-  const handleBookingInputChange = (e) => {
-    const { name, value } = e.target;
-    setBookingData(prev => ({ ...prev, [name]: value }));
+  const resetBooking = () => {
+    setShowModal(false);
+    setTimeout(() => {
+      setBookingStep(1);
+      setSelectedDoc(null);
+      setSelectedDate("");
+      setSelectedTime("");
+      setVisitType("in-person");
+      setVisitReason("");
+    }, 300);
   };
 
-  const handleOpenBookingModal = () => {
-    setShowBookingModal(true);
-    setBookingError("");
-  };
-
-  const handleCloseBookingModal = () => {
-    setShowBookingModal(false);
-    setBookingData({ doctor: "", date: "", time: "", type: "in-person", reason: "" });
-    setBookingError("");
-  };
-
-  const handleBookAppointment = async (e) => {
-    e.preventDefault();
-    setBookingError("");
-    const selectedDateTime = new Date(`${bookingData.date}T${bookingData.time}`);
-    if (selectedDateTime <= new Date()) {
-      setBookingError("Please select a future date and time.");
-      return;
+  const handleNextStep = () => {
+    if (bookingStep === 1 && !selectedDoc) return toast.error("Please select a doctor.");
+    if (bookingStep === 2) {
+      if (!selectedDate) return toast.error("Please select a date.");
+      if (selectedDate < today) return toast.error("Past dates are not allowed.");
+      if (!selectedTime) return toast.error("Please select a time slot.");
     }
-    // Add API call to backend here
-    // Example:
-    // const res = await fetch("/api/appointments", { method: "POST", body: JSON.stringify({ ...bookingData }) })
-    // ...handle response...
-    setShowBookingModal(false);
+    setBookingStep(prev => prev + 1);
+  };
+
+  const handleConfirmBooking = async () => {
+    if (!visitReason.trim()) return toast.error("Please provide a reason for the visit.");
+    
+    setIsSubmitting(true);
+    // Simulate API Call
+    setTimeout(() => {
+      setIsSubmitting(false);
+      toast.success("Appointment booked successfully!");
+      resetBooking();
+      // Here you would trigger context refetch
+    }, 1500);
   };
 
   return (
-    <div className="appointments-page">
+    <div className="appointments-page premium-ui">
       <div className="container">
-        <div className="appointments-header">
-          <h1 className="section-title">My Appointments</h1>
-          <p className="appointments-subtitle">
-            Manage your upcoming and past appointments
-          </p>
-        </div>
-
-        <div className="appointments-tabs">
-          <button 
-            className={`tab-btn ${activeTab === 'upcoming' ? 'active' : ''}`}
-            onClick={() => setActiveTab('upcoming')}
-          >
-            Upcoming ({appointments.filter(apt => apt.status === "confirmed" || apt.status === "pending").length})
-          </button>
-          <button 
-            className={`tab-btn ${activeTab === 'past' ? 'active' : ''}`}
-            onClick={() => setActiveTab('past')}
-          >
-            Past ({appointments.filter(apt => apt.status === "cancelled").length})
+        
+        {/* Header & Main Stats */}
+        <div className="apt-header-section">
+          <div className="apt-header-text">
+            <h1 className="title-gradient">My Appointments</h1>
+            <p className="subtitle">Manage your medical schedule and bookings</p>
+          </div>
+          <button className="btn primary-btn btn-lg pulse-shadow" onClick={() => setShowModal(true)}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            Book Appointment
           </button>
         </div>
 
-        <div className="appointments-content">
-          {filteredAppointments.length === 0 ? (
-            <div className="no-appointments">
-              <div className="no-appointments-icon">📅</div>
-              <h3>No appointments found</h3>
-              <p>
-                {activeTab === 'upcoming' 
-                  ? "You don't have any upcoming appointments. Book one now!" 
-                  : "No past appointments to display."
-                }
-              </p>
-              {activeTab === 'upcoming' && (
-                <button className="btn primary-btn" onClick={handleOpenBookingModal}>
-                  Book New Appointment
-                </button>
-              )}
+        <div className="apt-stats-grid">
+          <div className="stat-card">
+            <div className="stat-icon bg-blue-100 text-blue-600"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg></div>
+            <div className="stat-info">
+              <h3>{appointments.filter(a => a.status === 'confirmed').length}</h3>
+              <p>Confirmed</p>
             </div>
-          ) : (
-            <div className="appointments-list">
-              {filteredAppointments.map((appointment) => (
-                <div className="appointment-card card" key={appointment._id}>
-                  <div className="appointment-header">
-                    <div className="appointment-info">
-                      <h3 className="doctor-name">{appointment.doctorName || appointment.doctor?.name}</h3>
-                      <p className="specialty">{appointment.specialty || appointment.doctor?.specialization}</p>
-                    </div>
-                    <div className={`status-badge ${getStatusColor(appointment.status)}`}>
-                      {getStatusText(appointment.status)}
-                    </div>
-                  </div>
-
-                  <div className="appointment-details">
-                    <div className="detail-row">
-                      <div className="detail-item">
-                        <span className="detail-icon">📅</span>
-                        <span className="detail-label">Date:</span>
-                        <span className="detail-value">{new Date(appointment.date).toLocaleDateString()}</span>
-                      </div>
-                      <div className="detail-item">
-                        <span className="detail-icon">⏰</span>
-                        <span className="detail-label">Time:</span>
-                        <span className="detail-value">{appointment.time}</span>
-                      </div>
-                    </div>
-                    <div className="detail-row">
-                      <div className="detail-item">
-                        <span className="detail-icon">🏥</span>
-                        <span className="detail-label">Type:</span>
-                        <span className="detail-value">{appointment.type}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="appointment-actions">
-                    {appointment.status === "confirmed" && (
-                      <>
-                        <button 
-                          className="btn secondary-btn"
-                          onClick={() => handleRescheduleAppointment(appointment._id)}
-                        >
-                          Reschedule
-                        </button>
-                        <button 
-                          className="btn secondary-btn"
-                          onClick={() => handleCancelAppointment(appointment._id)}
-                        >
-                          Cancel
-                        </button>
-                      </>
-                    )}
-                    {appointment.status === "pending" && (
-                      <button 
-                        className="btn secondary-btn"
-                        onClick={() => handleCancelAppointment(appointment._id)}
-                      >
-                        Cancel
-                      </button>
-                    )}
-                    {appointment.status === "cancelled" && (
-                      <button className="btn primary-btn">
-                        Book Again
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
+          </div>
+          <div className="stat-card">
+            <div className="stat-icon bg-yellow-100 text-yellow-600"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg></div>
+            <div className="stat-info">
+              <h3>{appointments.filter(a => a.status === 'pending').length}</h3>
+              <p>Pending</p>
             </div>
-          )}
+          </div>
+          <div className="stat-card">
+            <div className="stat-icon bg-red-100 text-red-600"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg></div>
+            <div className="stat-info">
+              <h3>{appointments.filter(a => a.status === 'cancelled').length}</h3>
+              <p>Cancelled</p>
+            </div>
+          </div>
         </div>
 
-        <div className="appointments-summary">
-          <div className="summary-card">
-            <h3>Appointment Summary</h3>
-            <div className="summary-stats">
-              <div className="summary-stat">
-                <span className="stat-number">{appointments.filter(apt => apt.status === "confirmed").length}</span>
-                <span className="stat-label">Confirmed</span>
+        {/* Tabs & List */}
+        <div className="apt-main-content">
+          <div className="modern-tabs">
+            <button className={`tab ${activeTab === 'upcoming' ? 'active' : ''}`} onClick={() => setActiveTab('upcoming')}>
+              Upcoming
+            </button>
+            <button className={`tab ${activeTab === 'past' ? 'active' : ''}`} onClick={() => setActiveTab('past')}>
+              Past & Cancelled
+            </button>
+          </div>
+
+          <div className="apt-list-wrapper">
+            {loading ? (
+              <div className="loader-container"><div className="spinner"></div></div>
+            ) : filteredAppointments.length === 0 ? (
+              <div className="empty-state">
+                <div className="empty-icon">📅</div>
+                <h3>No appointments found</h3>
+                <p>{activeTab === 'upcoming' ? "Your schedule is clear. Book a new appointment to see a doctor." : "No past history available."}</p>
               </div>
-              <div className="summary-stat">
-                <span className="stat-number">{appointments.filter(apt => apt.status === "pending").length}</span>
-                <span className="stat-label">Pending</span>
+            ) : (
+              <div className="apt-list">
+                {filteredAppointments.map(apt => (
+                  <div key={apt._id} className="apt-card fade-in-up">
+                    <div className="apt-card-header">
+                      <div className="doctor-meta">
+                        <div className="doc-avatar"><img src={`https://ui-avatars.com/api/?name=${apt.doctorName || 'Doc'}&background=random`} alt="Doctor" /></div>
+                        <div>
+                          <h4>{apt.doctorName || "Doctor Name"}</h4>
+                          <span className="doc-specialty">{apt.specialty || "Specialist"}</span>
+                        </div>
+                      </div>
+                      <span className={`status-badge ${getStatusColor(apt.status)}`}>{getStatusText(apt.status)}</span>
+                    </div>
+                    <div className="apt-card-body">
+                      <div className="detail-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg> {new Date(apt.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</div>
+                      <div className="detail-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg> {apt.time}</div>
+                      <div className="detail-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg> {apt.type}</div>
+                    </div>
+                    <div className="apt-card-footer">
+                      {(apt.status === "confirmed" || apt.status === "pending") && (
+                        <button className="btn outline-btn btn-sm" onClick={() => handleCancelAppointment(apt._id)}>Cancel Booking</button>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
-              <div className="summary-stat">
-                <span className="stat-number">{appointments.filter(apt => apt.status === "cancelled").length}</span>
-                <span className="stat-label">Cancelled</span>
-              </div>
-            </div>
+            )}
           </div>
         </div>
       </div>
 
-      <Modal
-        isOpen={showBookingModal}
-        onRequestClose={handleCloseBookingModal}
-        contentLabel="Book Appointment"
-        ariaHideApp={false}
-        className="modal-container"
-        overlayClassName="modal-overlay"
-      >
-        <div className="modal-content appointment-modal">
-          <div className="modal-header">
-            <div className="header-info">
-              <h2>Book New Appointment</h2>
-              <p>Fill in the details below to schedule your visit</p>
+      {/* Modern Booking Modal */}
+      {showModal && (
+        <div className="glass-modal-overlay fade-in" onClick={resetBooking}>
+          <div className="glass-modal scale-in" onClick={e => e.stopPropagation()}>
+            <button className="close-btn" onClick={resetBooking}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+            
+            <div className="modal-sidebar">
+              <h2>Book Visit</h2>
+              <div className="steps-indicator">
+                <div className={`step ${bookingStep >= 1 ? 'active' : ''}`}>1. Select Doctor</div>
+                <div className={`step ${bookingStep >= 2 ? 'active' : ''}`}>2. Date & Time</div>
+                <div className={`step ${bookingStep >= 3 ? 'active' : ''}`}>3. Details</div>
+              </div>
+              
+              {/* Summary shows as you progress */}
+              {bookingStep > 1 && selectedDoc && (
+                <div className="booking-summary-mini fade-in">
+                  <h4>Summary</h4>
+                  <p><strong>Dr:</strong> {selectedDoc.name}</p>
+                  {selectedDate && <p><strong>Date:</strong> {selectedDate}</p>}
+                  {selectedTime && <p><strong>Time:</strong> {selectedTime}</p>}
+                </div>
+              )}
             </div>
-            <button className="close-modal-btn" onClick={handleCloseBookingModal}>
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-              </svg>
-            </button>
+
+            <div className="modal-content-area">
+              {/* STEP 1: DOCTOR */}
+              {bookingStep === 1 && (
+                <div className="step-content slide-in-right">
+                  <h3>Choose a Specialist</h3>
+                  <div className="doctor-selection-grid">
+                    {mockDoctors.map(doc => (
+                      <div 
+                        key={doc.id} 
+                        className={`doc-chip ${selectedDoc?.id === doc.id ? 'selected' : ''}`}
+                        onClick={() => setSelectedDoc(doc)}
+                      >
+                        <img src={doc.avatar} alt={doc.name} />
+                        <div>
+                          <h5>{doc.name}</h5>
+                          <span>{doc.specialty}</span>
+                        </div>
+                        {selectedDoc?.id === doc.id && <div className="check-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg></div>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* STEP 2: DATE & TIME */}
+              {bookingStep === 2 && (
+                <div className="step-content slide-in-right">
+                  <h3>Select Date & Time</h3>
+                  
+                  <div className="form-group mt-4">
+                    <label>Appointment Date (Future dates only)</label>
+                    <input 
+                      type="date" 
+                      className="premium-input" 
+                      min={today}
+                      value={selectedDate}
+                      onChange={(e) => setSelectedDate(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="form-group mt-6">
+                    <label>Available Slots</label>
+                    <div className="time-slots-grid">
+                      {timeSlots.map(time => (
+                        <button 
+                          key={time}
+                          className={`time-chip ${selectedTime === time ? 'selected' : ''}`}
+                          onClick={() => setSelectedTime(time)}
+                        >
+                          {time}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* STEP 3: DETAILS */}
+              {bookingStep === 3 && (
+                <div className="step-content slide-in-right">
+                  <h3>Finalize Booking</h3>
+                  
+                  <div className="form-group mt-4">
+                    <label>Visit Type</label>
+                    <div className="radio-group">
+                      <label className={`radio-card ${visitType === 'in-person' ? 'selected' : ''}`}>
+                        <input type="radio" name="visitType" value="in-person" checked={visitType === 'in-person'} onChange={() => setVisitType("in-person")} />
+                        🏥 In-Person
+                      </label>
+                      <label className={`radio-card ${visitType === 'video' ? 'selected' : ''}`}>
+                        <input type="radio" name="visitType" value="video" checked={visitType === 'video'} onChange={() => setVisitType("video")} />
+                        💻 Video Call
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="form-group mt-6">
+                    <label>Reason for Visit *</label>
+                    <textarea 
+                      className="premium-input"
+                      rows="3"
+                      placeholder="Please briefly describe your symptoms or reason for visit..."
+                      value={visitReason}
+                      onChange={(e) => setVisitReason(e.target.value)}
+                    ></textarea>
+                  </div>
+                </div>
+              )}
+
+              <div className="modal-actions">
+                {bookingStep > 1 && (
+                  <button className="btn outline-btn" onClick={() => setBookingStep(prev => prev - 1)}>Back</button>
+                )}
+                {bookingStep < 3 ? (
+                  <button className="btn primary-btn ml-auto" onClick={handleNextStep}>Continue</button>
+                ) : (
+                  <button className="btn primary-btn ml-auto" onClick={handleConfirmBooking} disabled={isSubmitting}>
+                    {isSubmitting ? <span className="spinner-small"></span> : "Confirm Booking"}
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
-
-          <form onSubmit={handleBookAppointment} className="booking-form">
-            <div className="form-grid">
-              <div className="form-group full-width">
-                <label>Select Doctor</label>
-                <div className="input-wrapper">
-                  <span className="input-icon">👨‍⚕️</span>
-                  <input 
-                    type="text" 
-                    name="doctor" 
-                    placeholder="e.g. Dr. Sarah Smith"
-                    value={bookingData.doctor} 
-                    onChange={handleBookingInputChange} 
-                    className="form-input"
-                    required 
-                  />
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label>Preferred Date</label>
-                <div className="input-wrapper">
-                  <input 
-                    type="date" 
-                    name="date" 
-                    value={bookingData.date} 
-                    onChange={handleBookingInputChange} 
-                    className="form-input"
-                    required 
-                  />
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label>Preferred Time</label>
-                <div className="input-wrapper">
-                  <input 
-                    type="time" 
-                    name="time" 
-                    value={bookingData.time} 
-                    onChange={handleBookingInputChange} 
-                    className="form-input"
-                    required 
-                  />
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label>Appointment Type</label>
-                <select 
-                  name="type" 
-                  value={bookingData.type} 
-                  onChange={handleBookingInputChange} 
-                  className="form-input"
-                  required
-                >
-                  <option value="in-person">🏥 In-Person Visit</option>
-                  <option value="video-call">💻 Video Consultation</option>
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label>Reason for Visit</label>
-                <input 
-                  type="text" 
-                  name="reason" 
-                  placeholder="e.g. Regular checkup"
-                  value={bookingData.reason} 
-                  onChange={handleBookingInputChange} 
-                  className="form-input"
-                  required 
-                />
-              </div>
-            </div>
-
-            {bookingError && (
-              <div className="error-banner">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-                </svg>
-                {bookingError}
-              </div>
-            )}
-
-            <div className="modal-footer">
-              <button type="button" className="btn secondary-btn" onClick={handleCloseBookingModal}>Cancel</button>
-              <button type="submit" className="btn primary-btn booking-submit-btn">
-                Confirm Booking
-              </button>
-            </div>
-          </form>
         </div>
-      </Modal>
+      )}
+
     </div>
   );
 };
